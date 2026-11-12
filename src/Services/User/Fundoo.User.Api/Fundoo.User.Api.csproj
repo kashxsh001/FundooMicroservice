@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	  <UserSecretsId>c1bb17a5-9acc-40d2-9a98-d5473d5b5030</UserSecretsId>
+  </PropertyGroup>
+	<ItemGroup>
+	  <Content Remove="appsettings.Local.json" />
+	</ItemGroup>
+	<ItemGroup>
+	  <None Include="appsettings.Local.json" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.34" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.31" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.34">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.34">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Fundoo.User.Application\Fundoo.User.Application.csproj" />
+		<ProjectReference Include="..\Fundoo.User.Infrastructure\Fundoo.User.Infrastructure.csproj" />
+	</ItemGroup>
+</Project>
