@@ -20,6 +20,7 @@ public interface IAuthService
     Task<AuthResult> VerifyTwoFactorLoginAsync(string twoFactorToken, string code, CancellationToken cancellationToken = default);
     Task<TwoFactorSetupResult?> SetupTwoFactorAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<bool> EnableTwoFactorAsync(Guid userId, string code, CancellationToken cancellationToken = default);
+    Task<bool> DisableTwoFactorAsync(Guid userId, string password, string code, CancellationToken cancellationToken = default);
     Task<AuthResult> LoginWithGoogleAsync(string googleId, string email, string firstName, string lastName,
     bool emailVerified, CancellationToken cancellationToken = default);
 }
