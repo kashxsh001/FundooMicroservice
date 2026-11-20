@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args); //WebApplication.CreateBuilder configures a Generic Host under the hood while embedding HTTP-specific features like Kestrel middleware pipelines.
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole();
 /*The Generic Host is built on top of the ASP.NET Core hosting infrastructure and provides a consistent way to configure and run applications
  * regardless of the application type. It encapsulates common application concerns such as configuration, dependency injection, logging, 
  * and application lifetime management.*/

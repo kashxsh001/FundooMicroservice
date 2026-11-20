@@ -7,6 +7,8 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole();
 // Local development: always load user secrets, even if VS starts the app without the Development profile
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 

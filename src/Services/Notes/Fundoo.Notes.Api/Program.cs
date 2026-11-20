@@ -11,6 +11,22 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Emit structured JSON logs so fields such as RequestId and NoteId remain searchable.
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole();
+var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379,abortConnect=false";
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = redisConnection;
+    options.InstanceName = "fundoo:notes:";
+});
+builder.Services.Configure<Fundoo.Notes.Api.Messaging.KafkaOptions>(
+    builder.Configuration.GetSection("Kafka"));
+builder.Services.AddSingleton<Fundoo.Notes.Application.Interfaces.INoteEventPublisher,
+    Fundoo.Notes.Api.Messaging.KafkaNoteEventPublisher>();
+builder.Services.AddSingleton<Fundoo.Notes.Application.Interfaces.IUserNotesCache,
+    Fundoo.Notes.Api.Messaging.RedisUserNotesCache>();
+
 builder.Services.AddControllers();//This registers MVC controller-related services.
 builder.Services.AddEndpointsApiExplorer();
 
@@ -76,6 +92,22 @@ builder.Services.AddAuthorization();
 
 
 var app = builder.Build(); //The application is built using the registered services and configuration.
+
+app.Use(async (context, next) =>
+{
+    var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("HttpRequest");
+    var started = System.Diagnostics.Stopwatch.GetTimestamp();
+    try
+    {
+        await next();
+    }
+    finally
+    {
+        logger.LogInformation("HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs}ms RequestId={RequestId}",
+            context.Request.Method, context.Request.Path, context.Response.StatusCode,
+            System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds, context.TraceIdentifier);
+    }
+});
 
 app.UseExceptionHandler(errorApp => errorApp.Run(async ctx =>
 {

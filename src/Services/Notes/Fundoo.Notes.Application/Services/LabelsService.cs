@@ -6,10 +6,15 @@ namespace Fundoo.Notes.Application.Services
     public class LabelsService : ILabelsService
     {
         private readonly ILabelsRepository _labelsRepository;
+        private readonly IUserNotesCache _userNotesCache;
 
-        public LabelsService(ILabelsRepository labelsRepository) => _labelsRepository = labelsRepository;
+        public LabelsService(ILabelsRepository labelsRepository, IUserNotesCache userNotesCache)
+        {
+            _labelsRepository = labelsRepository;
+            _userNotesCache = userNotesCache;
+        }
 
-        public Task<Label> CreateAsync(Guid userId, string name, CancellationToken cancellationToken = default)
+        public async Task<Label> CreateAsync(Guid userId, string name, CancellationToken cancellationToken = default)
         {
             ValidateName(name);
 
@@ -20,29 +25,45 @@ namespace Fundoo.Notes.Application.Services
                 Name = name.Trim()
             };
 
-            return _labelsRepository.CreateAsync(label, cancellationToken);
+            var created = await _labelsRepository.CreateAsync(label, cancellationToken);
+            await _userNotesCache.InvalidateAsync(userId, cancellationToken);
+            return created;
         }
 
         public Task<IReadOnlyList<Label>> GetAllAsync(Guid userId, CancellationToken cancellationToken = default)
             => _labelsRepository.GetAllAsync(userId, cancellationToken);
 
-        public Task<bool> UpdateAsync(Guid labelId, Guid userId, string name,
+        public async Task<bool> UpdateAsync(Guid labelId, Guid userId, string name,
             CancellationToken cancellationToken = default)
         {
             ValidateName(name);
-            return _labelsRepository.UpdateAsync(labelId, userId, name.Trim(), cancellationToken);
+            var updated = await _labelsRepository.UpdateAsync(labelId, userId, name.Trim(), cancellationToken);
+            if (updated) await _userNotesCache.InvalidateAsync(userId, cancellationToken);
+            return updated;
         }
 
-        public Task<bool> DeleteAsync(Guid labelId, Guid userId, CancellationToken cancellationToken = default)
-            => _labelsRepository.DeleteAsync(labelId, userId, cancellationToken);
+        public async Task<bool> DeleteAsync(Guid labelId, Guid userId, CancellationToken cancellationToken = default)
+        {
+            var deleted = await _labelsRepository.DeleteAsync(labelId, userId, cancellationToken);
+            if (deleted) await _userNotesCache.InvalidateAsync(userId, cancellationToken);
+            return deleted;
+        }
 
-        public Task<bool> AttachToNoteAsync(Guid noteId, Guid labelId, Guid userId,
+        public async Task<bool> AttachToNoteAsync(Guid noteId, Guid labelId, Guid userId,
             CancellationToken cancellationToken = default)
-            => _labelsRepository.AttachToNoteAsync(noteId, labelId, userId, cancellationToken);
+        {
+            var attached = await _labelsRepository.AttachToNoteAsync(noteId, labelId, userId, cancellationToken);
+            if (attached) await _userNotesCache.InvalidateAsync(userId, cancellationToken);
+            return attached;
+        }
 
-        public Task<bool> DetachFromNoteAsync(Guid noteId, Guid labelId, Guid userId,
+        public async Task<bool> DetachFromNoteAsync(Guid noteId, Guid labelId, Guid userId,
             CancellationToken cancellationToken = default)
-            => _labelsRepository.DetachFromNoteAsync(noteId, labelId, userId, cancellationToken);
+        {
+            var detached = await _labelsRepository.DetachFromNoteAsync(noteId, labelId, userId, cancellationToken);
+            if (detached) await _userNotesCache.InvalidateAsync(userId, cancellationToken);
+            return detached;
+        }
 
         private static void ValidateName(string? name)
         {
