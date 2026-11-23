@@ -1,0 +1,203 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  01-init.sql: |
+    CREATE DATABASE "UserDb";
+    CREATE DATABASE "NotesDb";
+  02-user-schema.sql: |
+    \connect "UserDb"
+    CREATE TABLE IF NOT EXISTS "Users" (
+      "Id" uuid PRIMARY KEY,
+      "FirstName" text NOT NULL,
+      "LastName" text NOT NULL,
+      "Email" character varying(256) NOT NULL,
+      "NormalizedEmail" character varying(256) NOT NULL,
+      "PasswordHash" text NOT NULL,
+      "IsActive" boolean NOT NULL,
+      "CreatedAtUtc" timestamp with time zone NOT NULL,
+      "UpdatedAtUtc" timestamp with time zone NOT NULL,
+      "TwoFactorEnabled" boolean NOT NULL DEFAULT false,
+      "TwoFactorLastStep" bigint NOT NULL DEFAULT 0,
+      "TwoFactorSecret" text NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_NormalizedEmail"
+      ON "Users" ("NormalizedEmail");
+    CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+      "MigrationId" character varying(150) NOT NULL PRIMARY KEY,
+      "ProductVersion" character varying(32) NOT NULL
+    );
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20261028065812_InitialUserCreate', '8.0.34'),
+           ('20261112042654_Add2FA', '8.0.34')
+    ON CONFLICT ("MigrationId") DO NOTHING;
+  03-notes-schema.sql: |
+    \connect "NotesDb"
+    CREATE TABLE IF NOT EXISTS notes (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL,
+      title text NOT NULL,
+      content text NOT NULL,
+      color text NULL,
+      is_pinned boolean NOT NULL DEFAULT false,
+      is_archived boolean NOT NULL DEFAULT false,
+      is_trashed boolean NOT NULL DEFAULT false,
+      created_at_utc timestamp with time zone NOT NULL,
+      updated_at_utc timestamp with time zone NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_notes_user_id ON notes (user_id);
+    CREATE TABLE IF NOT EXISTS labels (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL,
+      name text NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_labels_user_id ON labels (user_id);
+    CREATE TABLE IF NOT EXISTS note_labels (
+      note_id uuid NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      label_id uuid NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+      PRIMARY KEY (note_id, label_id)
+    );
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: fundoo-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: fundoo-secrets, key: POSTGRES_PASSWORD } }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true }
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: postgres-pvc }
+        - name: init
+          configMap: { name: postgres-init }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector: { app: postgres }
+  ports:
+    - { name: postgres, port: 5432, targetPort: 5432 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: redis }
+  template:
+    metadata:
+      labels: { app: redis }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.4-alpine
+          args: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - { name: redis, containerPort: 6379 }
+          readinessProbe:
+            exec: { command: ["redis-cli", "ping"] }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector: { app: redis }
+  ports:
+    - { name: redis, port: 6379, targetPort: 6379 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: kafka }
+  template:
+    metadata:
+      labels: { app: kafka }
+    spec:
+      containers:
+        - name: kafka
+          image: apache/kafka:3.9.1
+          ports:
+            - { name: kafka, containerPort: 9092 }
+          env:
+            - { name: KAFKA_NODE_ID, value: "1" }
+            - { name: KAFKA_PROCESS_ROLES, value: "broker,controller" }
+            - { name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093" }
+            - { name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka:9092" }
+            - { name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER" }
+            - { name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT" }
+            - { name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093" }
+            - { name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1" }
+            - { name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS, value: "0" }
+            - { name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "true" }
+          readinessProbe:
+            tcpSocket: { port: 9092 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+spec:
+  selector: { app: kafka }
+  ports:
+    - { name: kafka, port: 9092, targetPort: 9092 }
