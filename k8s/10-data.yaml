@@ -14,6 +14,7 @@ data:
       "LastName" text NOT NULL,
       "Email" character varying(256) NOT NULL,
       "NormalizedEmail" character varying(256) NOT NULL,
+      "GoogleId" text NULL,
       "PasswordHash" text NOT NULL,
       "IsActive" boolean NOT NULL,
       "CreatedAtUtc" timestamp with time zone NOT NULL,

@@ -30,6 +30,8 @@ spec:
         - name: user-api
           image: kashxsh001/fundoo-user:live
           imagePullPolicy: Always
+          command: ["dotnet"]
+          args: ["Fundoo.User.Api.dll"]
           ports:
             - { name: http, containerPort: 8080 }
           envFrom:
@@ -78,6 +80,8 @@ spec:
         - name: notes-api
           image: kashxsh001/fundoo-notes:live
           imagePullPolicy: Always
+          command: ["dotnet"]
+          args: ["Fundoo.Notes.Api.dll"]
           ports:
             - { name: http, containerPort: 8080 }
           envFrom:
@@ -120,6 +124,8 @@ spec:
         - name: notification-api
           image: kashxsh001/fundoo-notification:live
           imagePullPolicy: Always
+          command: ["dotnet"]
+          args: ["Fundoo.Notification.Api.dll"]
           ports:
             - { name: http, containerPort: 8080 }
           envFrom:
@@ -170,6 +176,8 @@ spec:
         - name: gateway
           image: kashxsh001/fundoo-gateway:live
           imagePullPolicy: Always
+          command: ["dotnet"]
+          args: ["Fundoo.ApiGateway.dll"]
           ports:
             - { name: http, containerPort: 8080 }
           envFrom:
