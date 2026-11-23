@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+.git/
+.vs/
+_old_backup/
+**/appsettings.Local.json
+**/secrets.json
+**/.env
