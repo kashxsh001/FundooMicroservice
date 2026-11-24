@@ -3,5 +3,6 @@ kind: Kustomization
 namespace: fundoo
 resources:
   - 00-namespace.yaml
+  - 05-user-dataprotection.yaml
   - 10-data.yaml
   - 20-apps.yaml

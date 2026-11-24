@@ -87,7 +87,13 @@ builder.Services.AddHttpClient("NotificationService", client =>
     client.BaseAddress = new Uri(baseUrl);
 });
 builder.Services.AddSingleton<TotpService>();
-builder.Services.AddDataProtection();      // secret ko encrypt karne ke liye
+// Keep the encryption key ring stable across Kubernetes container replacements.
+// This path is backed by a dedicated persistent volume in the K3s deployment.
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysDirectory"]
+    ?? "/var/lib/fundoo/data-protection-keys";
+builder.Services.AddDataProtection()
+    .SetApplicationName("FundooMicroService")
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
 builder.Services.AddSingleton<HttpResiliencePolicies>();
 
 builder.Services.AddHttpClient("NotificationService", client =>

@@ -10,6 +10,7 @@ data:
   ConnectionStrings__Redis: redis:6379,abortConnect=false
   Kafka__BootstrapServers: kafka:9092
   Kafka__Topic: fundoo.note-events
+  DataProtection__KeysDirectory: /var/lib/fundoo/data-protection-keys
   NotificationService__BaseUrl: http://notification-api:8080/
   ReverseProxy__Clusters__user-cluster__Destinations__user-api__Address: http://user-api:8080/
   ReverseProxy__Clusters__notes-cluster__Destinations__notes-api__Address: http://notes-api:8080/
@@ -34,6 +35,9 @@ spec:
           args: ["Fundoo.User.Api.dll"]
           ports:
             - { name: http, containerPort: 8080 }
+          volumeMounts:
+            - name: data-protection-keys
+              mountPath: /var/lib/fundoo/data-protection-keys
           envFrom:
             - configMapRef: { name: fundoo-config }
           env:
@@ -54,6 +58,10 @@ spec:
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: 750m, memory: 768Mi }
+      volumes:
+        - name: data-protection-keys
+          persistentVolumeClaim:
+            claimName: user-dataprotection-pvc
 ---
 apiVersion: v1
 kind: Service
