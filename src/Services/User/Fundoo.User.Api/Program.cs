@@ -2,13 +2,24 @@ using Fundoo.User.Infrastructure.Resilience;
 using Fundoo.User.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Net;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Parse("10.42.0.0"), 24));
+    options.AllowedHosts.Add("172.198.51.151.sslip.io");
+});
 // Local development: always load user secrets, even if VS starts the app without the Development profile
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 
@@ -107,6 +118,8 @@ builder.Services.AddHttpClient("NotificationService", client =>
 .AddPolicyHandler((sp, _) => sp.GetRequiredService<HttpResiliencePolicies>().Timeout);  // inner
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())
 {

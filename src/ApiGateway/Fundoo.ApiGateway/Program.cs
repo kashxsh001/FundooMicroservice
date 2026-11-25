@@ -1,9 +1,19 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Net;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args); //WebApplication.CreateBuilder configures a Generic Host under the hood while embedding HTTP-specific features like Kestrel middleware pipelines.
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Parse("10.42.0.0"), 24));
+    options.AllowedHosts.Add("172.198.51.151.sslip.io");
+});
 /*The Generic Host is built on top of the ASP.NET Core hosting infrastructure and provides a consistent way to configure and run applications
  * regardless of the application type. It encapsulates common application concerns such as configuration, dependency injection, logging, 
  * and application lifetime management.*/
@@ -52,6 +62,7 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseRateLimiter();   // must be before MapReverseProxy
 app.MapReverseProxy();
 
